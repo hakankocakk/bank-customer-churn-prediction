@@ -8,8 +8,8 @@ from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
 
 class Preprocess():
 
-    def __init__(self, data_path):
-        self.dataframe = pd.read_csv(data_path)
+    def __init__(self, dataframe):
+        self.dataframe = dataframe
         self.cat_cols = []
         self.num_cols = []
         self.cat_but_car = []
