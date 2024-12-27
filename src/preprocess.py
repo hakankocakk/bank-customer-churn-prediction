@@ -135,7 +135,7 @@ class Preprocess():
             self.dataframe = pd.concat([self.dataframe, encoded_df], axis=1)
             self.dataframe.drop(columns=one_hot_cat_cols, inplace=True)
         else:
-            loaded_ohe = joblib.load('data/onehot_encoder.pkl')
+            loaded_ohe = joblib.load('data/one_hot_encoder.pkl')
             encoded_test_data = loaded_ohe.transform(self.dataframe[one_hot_cat_cols])
             new_columns = loaded_ohe.get_feature_names_out(one_hot_cat_cols)
             encoded_test_df = pd.DataFrame(encoded_test_data, columns=new_columns, index=self.dataframe.index)
@@ -152,7 +152,7 @@ class Preprocess():
             self.dataframe[self.num_cols] = scaler.fit_transform(self.dataframe[self.num_cols])
             joblib.dump(scaler, 'data/standardscaler.pkl')
         else:
-            loaded_scaler = joblib.load('data/onehot_encoder.pkl')
+            loaded_scaler = joblib.load('data/standardscaler.pkl')
             self.dataframe[self.num_cols] = loaded_scaler.transform(self.dataframe[self.num_cols])
 
         return self.dataframe
