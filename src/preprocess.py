@@ -8,8 +8,8 @@ from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
 
 class Preprocess():
 
-    def __init__(self, dataframe):
-        self.dataframe = dataframe
+    def __init__(self, X):
+        self.dataframe = X
         self.cat_cols = []
         self.num_cols = []
         self.cat_but_car = []
@@ -25,88 +25,97 @@ class Preprocess():
         cat_cols = cat_cols + num_but_cat
         num_cols = [col for col in self.dataframe.columns if self.dataframe[col].dtypes !='O']
         num_cols = [col for col in num_cols if col not in num_but_cat]
-        num_cols = [col for col in num_cols if col not in ['id', 'CustomerId']]
-        cat_cols = [col for col in cat_cols if col not in ["Exited", "Surname"]]
+        #num_cols = [col for col in num_cols if col not in ['id', 'CustomerId']]
+        #cat_cols = [col for col in cat_cols if col not in ["Exited", "Surname"]]
+        cat_cols = [col for col in cat_cols if col not in ["Exited"]]
         self.cat_cols = cat_cols
         self.num_cols = num_cols
         self.cat_but_car = cat_but_car
         return self.cat_cols, self.num_cols, self.cat_but_car
     
     
-    def Impute_missing_data(self):
-        for col in self.num_cols:
-            self.dataframe.loc[self.dataframe[col].isnull(), col] = self.dataframe[col].median()
-        for col in self.cat_cols:
-            self.dataframe.loc[self.dataframe[col].isnull(), col] = "Unknown"
-        return self.dataframe
+    def Impute_missing_num_data(self, dataframe):
+        for col in dataframe.columns:
+            dataframe.loc[dataframe[col].isnull(), col] = dataframe[col].median()
+        return dataframe
 
-    def Impute_outlier_data(self, q1=0.15, q3=0.85):
-        for col in self.num_cols:
-            self.dataframe[col] = self.dataframe[col].astype(float)
 
-            quartile_1 = self.dataframe[col].quantile(q1)
-            quartile_3 = self.dataframe[col].quantile(q3)
+    def Impute_missing_cat_data(self, dataframe):
+        for col in dataframe.columns:
+            dataframe.loc[dataframe[col].isnull(), col] = "Unknown"
+        return dataframe
+
+    def Impute_outlier_data(self, dataframe, q1=0.15, q3=0.85):
+        for col in self.num_cols:
+            dataframe[col] = dataframe[col].astype(float)
+
+            quartile_1 = dataframe[col].quantile(q1)
+            quartile_3 = dataframe[col].quantile(q3)
             inter_quantile = quartile_3 - quartile_1
 
             low_limit = quartile_1 - 1.5 * inter_quantile
             upp_limit = quartile_3 + 1.5 * inter_quantile
 
-            self.dataframe.loc[(self.dataframe[col] < low_limit), col] = low_limit
-            self.dataframe.loc[(self.dataframe[col] > upp_limit), col] = upp_limit
-        return self.dataframe
+            dataframe.loc[(dataframe[col] < low_limit), col] = low_limit
+            dataframe.loc[(dataframe[col] > upp_limit), col] = upp_limit
+        return dataframe
 
-    def feature_engineering(self):
+    def feature_engineering_cat(self, dataframe):
 
-        self.dataframe.loc[(self.dataframe["HasCrCard"]==1) & (self.dataframe["IsActiveMember"]==1), 
+        dataframe.loc[(dataframe["HasCrCard"]==1) & (dataframe["IsActiveMember"]==1), 
                            "NEW_ACTİVE_CARD"] = "active_card"
-        self.dataframe.loc[(self.dataframe["HasCrCard"]==1) & (self.dataframe["IsActiveMember"]==0), 
+        dataframe.loc[(dataframe["HasCrCard"]==1) & (dataframe["IsActiveMember"]==0), 
                            "NEW_ACTİVE_CARD"] = "inactive_card"
-        self.dataframe.loc[(self.dataframe["HasCrCard"]==0) & (self.dataframe["IsActiveMember"]==1), 
+        dataframe.loc[(dataframe["HasCrCard"]==0) & (dataframe["IsActiveMember"]==1), 
                            "NEW_ACTİVE_CARD"] = "active_notcard"
-        self.dataframe.loc[(self.dataframe["HasCrCard"]==0) & (self.dataframe["IsActiveMember"]==0), 
+        dataframe.loc[(dataframe["HasCrCard"]==0) & (dataframe["IsActiveMember"]==0), 
                            "NEW_ACTİVE_CARD"] = "inactive_notcard"
-
-        self.dataframe.loc[self.dataframe["Balance"] >= self.dataframe["EstimatedSalary"], 
-                           "NEW_IS_INVESTOR"] = "investor"
-        self.dataframe.loc[self.dataframe["Balance"] < self.dataframe["EstimatedSalary"], 
-                           "NEW_IS_INVESTOR"] = "not_investor"
-
-        self.dataframe.loc[(self.dataframe["Age"] >= 18) & (self.dataframe["Age"] < 30), 
-                           "NEW_AGE_CAT"] = "young"
-        self.dataframe.loc[(self.dataframe["Age"] >= 30) & (self.dataframe["Age"] < 50), 
-                           "NEW_AGE_CAT"] = "mature"
-        self.dataframe.loc[self.dataframe["Age"] >= 50, 
-                           "NEW_AGE_CAT"] = "senior"
-
-        self.dataframe.loc[(self.dataframe["Geography"] == "France") & (self.dataframe["NEW_IS_INVESTOR"] == "investor"), 
-                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "french_investor"
-        self.dataframe.loc[(self.dataframe["Geography"] == "Spain") & (self.dataframe["NEW_IS_INVESTOR"] == "investor"), 
-                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "spanish_investor"
-        self.dataframe.loc[(self.dataframe["Geography"] == "Germany") & (self.dataframe["NEW_IS_INVESTOR"] == "investor"), 
-                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "german_investor"
-        self.dataframe.loc[(self.dataframe["Geography"] == "France") & (self.dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
-                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "french_not_investor"
-        self.dataframe.loc[(self.dataframe["Geography"] == "Spain") & (self.dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
-                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "spanish_not_investor"
-        self.dataframe.loc[(self.dataframe["Geography"] == "Germany") & (self.dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
-                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "german_not_investor"
         
-        self.dataframe.loc[(self.dataframe["CreditScore"] < 489), 
+        """
+        dataframe.loc[(dataframe["Geography"] == "France") & (dataframe["NEW_IS_INVESTOR"] == "investor"), 
+                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "french_investor"
+        dataframe.loc[(dataframe["Geography"] == "Spain") & (dataframe["NEW_IS_INVESTOR"] == "investor"), 
+                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "spanish_investor"
+        dataframe.loc[(dataframe["Geography"] == "Germany") & (dataframe["NEW_IS_INVESTOR"] == "investor"), 
+                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "german_investor"
+        dataframe.loc[(dataframe["Geography"] == "France") & (dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
+                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "french_not_investor"
+        dataframe.loc[(dataframe["Geography"] == "Spain") & (dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
+                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "spanish_not_investor"
+        dataframe.loc[(dataframe["Geography"] == "Germany") & (dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
+                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "german_not_investor"
+        """
+        return dataframe
+    
+    def feature_engineering_num(self, dataframe):
+        dataframe.loc[(dataframe["Age"] >= 18) & (dataframe["Age"] < 30), 
+                           "NEW_AGE_CAT"] = "young"
+        dataframe.loc[(dataframe["Age"] >= 30) & (dataframe["Age"] < 50), 
+                           "NEW_AGE_CAT"] = "mature"
+        dataframe.loc[dataframe["Age"] >= 50, 
+                           "NEW_AGE_CAT"] = "senior"
+        
+        dataframe.loc[(dataframe["CreditScore"] < 489), 
                            "NEW_CREDİTSCORE_CAT"] = "very_risky"
-        self.dataframe.loc[(self.dataframe["CreditScore"] >= 489) & (self.dataframe["CreditScore"] < 599), 
+        dataframe.loc[(dataframe["CreditScore"] >= 489) & (dataframe["CreditScore"] < 599), 
                            "NEW_CREDİTSCORE_CAT"] = "risky"
-        self.dataframe.loc[(self.dataframe["CreditScore"] >= 599) & (self.dataframe["CreditScore"] < 704), 
+        dataframe.loc[(dataframe["CreditScore"] >= 599) & (dataframe["CreditScore"] < 704), 
                            "NEW_CREDİTSCORE_CAT"] = "normal"
-        self.dataframe.loc[(self.dataframe["CreditScore"] >= 704) & (self.dataframe["CreditScore"] < 812), 
+        dataframe.loc[(dataframe["CreditScore"] >= 704) & (dataframe["CreditScore"] < 812), 
                            "NEW_CREDİTSCORE_CAT"] = "not_risky"
-        self.dataframe.loc[(self.dataframe["CreditScore"] >= 812), 
+        dataframe.loc[(dataframe["CreditScore"] >= 812), 
                            "NEW_CREDİTSCORE_CAT"] = "very_not_risky"
         
-        return self.dataframe
+        dataframe.loc[dataframe["Balance"] >= dataframe["EstimatedSalary"], 
+                           "NEW_IS_INVESTOR"] = "investor"
+        dataframe.loc[dataframe["Balance"] < dataframe["EstimatedSalary"], 
+                           "NEW_IS_INVESTOR"] = "not_investor"
+        
+        return dataframe
 
 
-
-    def ordinalencoding(self, train=True):
+    def ordinalencoding(self, dataframe, train=True):
+        print(dataframe.columns)
         investor_size = ['not_investor', 'investor']
         age_cat_size = ['young', 'mature', 'senior']
         credi_score_size = ['very_risky', 'risky', 'normal', 'not_risky', 'very_not_risky']
@@ -114,48 +123,48 @@ class Preprocess():
         enc = OrdinalEncoder(categories=[investor_size, age_cat_size, credi_score_size])
         columns_to_encode = ["NEW_IS_INVESTOR", "NEW_AGE_CAT", "NEW_CREDİTSCORE_CAT"]
         if train:
-            self.dataframe[columns_to_encode] = enc.fit_transform(self.dataframe[columns_to_encode])
+            dataframe[columns_to_encode] = enc.fit_transform(dataframe[columns_to_encode])
             joblib.dump(enc, 'data/ordinal_encoder.pkl')
         else:
             loaded_encoder = joblib.load('data/ordinal_encoder.pkl')
-            self.dataframe[columns_to_encode] = loaded_encoder.transform(self.dataframe[columns_to_encode]) 
-        return self.dataframe
+            dataframe[columns_to_encode] = loaded_encoder.transform(dataframe[columns_to_encode]) 
+        return dataframe
 
 
-    def onehotencoding(self, train=True):
+    def onehotencoding(self, dataframe, train=True):
         self.cat_cols, self.num_cols, self.cat_but_car = self.create_col_type()
         one_hot_cat_cols = [col for col in self.cat_cols if col not in ["NEW_IS_INVESTOR", "NEW_AGE_CAT", "NEW_CREDİTSCORE_CAT"]]
 
         if train:
             ohe = OneHotEncoder(handle_unknown='ignore', sparse_output=False, drop='first')
-            encoded_cols = ohe.fit_transform(self.dataframe[one_hot_cat_cols])
+            encoded_cols = ohe.fit_transform(dataframe[one_hot_cat_cols])
             joblib.dump(ohe, 'data/one_hot_encoder.pkl')
             new_columns = ohe.get_feature_names_out(one_hot_cat_cols)
-            encoded_df = pd.DataFrame(encoded_cols, columns=new_columns, index=self.dataframe.index)
-            self.dataframe = pd.concat([self.dataframe, encoded_df], axis=1)
-            self.dataframe.drop(columns=one_hot_cat_cols, inplace=True)
+            encoded_df = pd.DataFrame(encoded_cols, columns=new_columns, index=dataframe.index)
+            dataframe = pd.concat([dataframe, encoded_df], axis=1)
+            dataframe.drop(columns=one_hot_cat_cols, inplace=True)
         else:
             loaded_ohe = joblib.load('data/one_hot_encoder.pkl')
-            encoded_test_data = loaded_ohe.transform(self.dataframe[one_hot_cat_cols])
+            encoded_test_data = loaded_ohe.transform(dataframe[one_hot_cat_cols])
             new_columns = loaded_ohe.get_feature_names_out(one_hot_cat_cols)
-            encoded_test_df = pd.DataFrame(encoded_test_data, columns=new_columns, index=self.dataframe.index)
-            self.dataframe = pd.concat([self.dataframe.reset_index(drop=True), encoded_test_df], axis=1)
-            self.dataframe.drop(columns=one_hot_cat_cols, inplace=True)
+            encoded_test_df = pd.DataFrame(encoded_test_data, columns=new_columns, index=dataframe.index)
+            dataframe = pd.concat([dataframe.reset_index(drop=True), encoded_test_df], axis=1)
+            dataframe.drop(columns=one_hot_cat_cols, inplace=True)
 
-        return self.dataframe
+        return dataframe
 
-    def normalization(self, train=True):
+    def normalization(self, dataframe, train=True):
         self.cat_cols, self.num_cols, self.cat_but_car = self.create_col_type()
 
         if train:
             scaler = StandardScaler()
-            self.dataframe[self.num_cols] = scaler.fit_transform(self.dataframe[self.num_cols])
+            dataframe[self.num_cols] = scaler.fit_transform(dataframe[self.num_cols])
             joblib.dump(scaler, 'data/standardscaler.pkl')
         else:
             loaded_scaler = joblib.load('data/standardscaler.pkl')
-            self.dataframe[self.num_cols] = loaded_scaler.transform(self.dataframe[self.num_cols])
+            dataframe[self.num_cols] = loaded_scaler.transform(dataframe[self.num_cols])
 
-        return self.dataframe
+        return dataframe
 
     
     
