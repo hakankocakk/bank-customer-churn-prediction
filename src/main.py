@@ -2,13 +2,11 @@ import pandas as pd
 import preprocess
 import joblib
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import make_pipeline
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import FunctionTransformer
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import FunctionTransformer, StandardScaler
 from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score, f1_score
 
 def main():
 
@@ -56,21 +54,14 @@ def main():
 
 
     pipeline.fit(X_train, y_train)
-   
-
     joblib.dump(pipeline, 'src/saved_pipeline.pkl')
 
     loaded_pipeline = joblib.load('src/saved_pipeline.pkl')
     y_pred = loaded_pipeline.predict(X_test)
 
-
-    print(set(y_pred))
-    print(y_test)
-    from sklearn.metrics import accuracy_score, f1_score
     accuracy = accuracy_score(y_test, y_pred)
     print(f"Accuracy: {accuracy:.2f}")
 
-    # F1 skoru hesaplama
     f1 = f1_score(y_test, y_pred)
     print(f"F1 Score: {f1:.2f}")
 
