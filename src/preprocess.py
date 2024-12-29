@@ -71,7 +71,7 @@ class Preprocess():
         dataframe.loc[(dataframe["HasCrCard"]==0) & (dataframe["IsActiveMember"]==0), 
                            "NEW_ACTİVE_CARD"] = "inactive_notcard"
         
-        """
+        
         dataframe.loc[(dataframe["Geography"] == "France") & (dataframe["NEW_IS_INVESTOR"] == "investor"), 
                            "NEW_IS_GEOGRAPHY_INVESTOR"] = "french_investor"
         dataframe.loc[(dataframe["Geography"] == "Spain") & (dataframe["NEW_IS_INVESTOR"] == "investor"), 
@@ -84,7 +84,7 @@ class Preprocess():
                            "NEW_IS_GEOGRAPHY_INVESTOR"] = "spanish_not_investor"
         dataframe.loc[(dataframe["Geography"] == "Germany") & (dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
                            "NEW_IS_GEOGRAPHY_INVESTOR"] = "german_not_investor"
-        """
+        
         return dataframe
     
     def feature_engineering_num(self, dataframe):
@@ -111,7 +111,7 @@ class Preprocess():
         dataframe.loc[dataframe["Balance"] < dataframe["EstimatedSalary"], 
                            "NEW_IS_INVESTOR"] = "not_investor"
         
-        return dataframe
+        return dataframe 
 
 
     def ordinalencoding(self, dataframe, train=True):
@@ -134,6 +134,7 @@ class Preprocess():
     def onehotencoding(self, dataframe, train=True):
         self.cat_cols, self.num_cols, self.cat_but_car = self.create_col_type()
         one_hot_cat_cols = [col for col in self.cat_cols if col not in ["NEW_IS_INVESTOR", "NEW_AGE_CAT", "NEW_CREDİTSCORE_CAT"]]
+        
 
         if train:
             ohe = OneHotEncoder(handle_unknown='ignore', sparse_output=False, drop='first')
@@ -150,12 +151,12 @@ class Preprocess():
             encoded_test_df = pd.DataFrame(encoded_test_data, columns=new_columns, index=dataframe.index)
             dataframe = pd.concat([dataframe.reset_index(drop=True), encoded_test_df], axis=1)
             dataframe.drop(columns=one_hot_cat_cols, inplace=True)
-
+        
         return dataframe
 
     def normalization(self, dataframe, train=True):
         self.cat_cols, self.num_cols, self.cat_but_car = self.create_col_type()
-
+        
         if train:
             scaler = StandardScaler()
             dataframe[self.num_cols] = scaler.fit_transform(dataframe[self.num_cols])
