@@ -3,27 +3,30 @@ import pandas as pd
 import numpy as np
 import joblib
 from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
+from imblearn.under_sampling import NearMiss
+from sklearn.base import BaseEstimator, TransformerMixin
 
 
 
 class Preprocess():
 
-    def __init__(self, X):
+    def __init__(self, X, y):
         self.dataframe = X
+        self.labels = y
         self.cat_cols = []
         self.num_cols = []
         self.cat_but_car = []
 
-    def create_col_type(self, threshold_cat = 3, threshold_car = 20):
-        cat_cols = [col for col in self.dataframe.columns if self.dataframe[col].dtypes =='O']
+    def create_col_type(self, dataframe, threshold_cat = 4, threshold_car = 20):
+        cat_cols = [col for col in dataframe.columns if dataframe[col].dtypes =='O']
         
-        cat_but_car = [col for col in self.dataframe.columns if ((self.dataframe[col].dtypes =='O') 
-                                                            and (self.dataframe[col].nunique() > threshold_car))]
-        num_but_cat = [col for col in self.dataframe.columns if ((self.dataframe[col].dtypes !='O') 
-                                                            and (self.dataframe[col].nunique() <= threshold_cat))]
+        cat_but_car = [col for col in dataframe.columns if ((dataframe[col].dtypes =='O') 
+                                                            and (dataframe[col].nunique() > threshold_car))]
+        num_but_cat = [col for col in dataframe.columns if ((dataframe[col].dtypes !='O') 
+                                                            and (dataframe[col].nunique() <= threshold_cat))]
         cat_cols = [col for col in cat_cols if col not in cat_but_car]
         cat_cols = cat_cols + num_but_cat
-        num_cols = [col for col in self.dataframe.columns if self.dataframe[col].dtypes !='O']
+        num_cols = [col for col in dataframe.columns if dataframe[col].dtypes !='O']
         num_cols = [col for col in num_cols if col not in num_but_cat]
         #num_cols = [col for col in num_cols if col not in ['id', 'CustomerId']]
         #cat_cols = [col for col in cat_cols if col not in ["Exited", "Surname"]]
@@ -35,17 +38,20 @@ class Preprocess():
     
     
     def Impute_missing_num_data(self, dataframe):
-        for col in dataframe.columns:
+        self.cat_cols, self.num_cols, self.cat_but_car = self.create_col_type(dataframe)
+        for col in self.num_cols:
             dataframe.loc[dataframe[col].isnull(), col] = dataframe[col].median()
         return dataframe
 
 
     def Impute_missing_cat_data(self, dataframe):
-        for col in dataframe.columns:
+        self.cat_cols, self.num_cols, self.cat_but_car = self.create_col_type(dataframe)
+        for col in self.cat_cols:
             dataframe.loc[dataframe[col].isnull(), col] = "Unknown"
         return dataframe
 
     def Impute_outlier_data(self, dataframe, q1=0.15, q3=0.85):
+        self.cat_cols, self.num_cols, self.cat_but_car = self.create_col_type(dataframe)
         for col in self.num_cols:
             dataframe[col] = dataframe[col].astype(float)
 
@@ -58,10 +64,10 @@ class Preprocess():
 
             dataframe.loc[(dataframe[col] < low_limit), col] = low_limit
             dataframe.loc[(dataframe[col] > upp_limit), col] = upp_limit
+        
         return dataframe
 
-    def feature_engineering_cat(self, dataframe):
-
+    def feature_engineering(self, dataframe):
         dataframe.loc[(dataframe["HasCrCard"]==1) & (dataframe["IsActiveMember"]==1), 
                            "NEW_ACTİVE_CARD"] = "active_card"
         dataframe.loc[(dataframe["HasCrCard"]==1) & (dataframe["IsActiveMember"]==0), 
@@ -71,23 +77,6 @@ class Preprocess():
         dataframe.loc[(dataframe["HasCrCard"]==0) & (dataframe["IsActiveMember"]==0), 
                            "NEW_ACTİVE_CARD"] = "inactive_notcard"
         
-        
-        dataframe.loc[(dataframe["Geography"] == "France") & (dataframe["NEW_IS_INVESTOR"] == "investor"), 
-                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "french_investor"
-        dataframe.loc[(dataframe["Geography"] == "Spain") & (dataframe["NEW_IS_INVESTOR"] == "investor"), 
-                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "spanish_investor"
-        dataframe.loc[(dataframe["Geography"] == "Germany") & (dataframe["NEW_IS_INVESTOR"] == "investor"), 
-                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "german_investor"
-        dataframe.loc[(dataframe["Geography"] == "France") & (dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
-                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "french_not_investor"
-        dataframe.loc[(dataframe["Geography"] == "Spain") & (dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
-                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "spanish_not_investor"
-        dataframe.loc[(dataframe["Geography"] == "Germany") & (dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
-                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "german_not_investor"
-        
-        return dataframe
-    
-    def feature_engineering_num(self, dataframe):
         dataframe.loc[(dataframe["Age"] >= 18) & (dataframe["Age"] < 30), 
                            "NEW_AGE_CAT"] = "young"
         dataframe.loc[(dataframe["Age"] >= 30) & (dataframe["Age"] < 50), 
@@ -111,29 +100,41 @@ class Preprocess():
         dataframe.loc[dataframe["Balance"] < dataframe["EstimatedSalary"], 
                            "NEW_IS_INVESTOR"] = "not_investor"
         
-        return dataframe 
+        dataframe.loc[(dataframe["Geography"] == "France") & (dataframe["NEW_IS_INVESTOR"] == "investor"), 
+                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "french_investor"
+        dataframe.loc[(dataframe["Geography"] == "Spain") & (dataframe["NEW_IS_INVESTOR"] == "investor"), 
+                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "spanish_investor"
+        dataframe.loc[(dataframe["Geography"] == "Germany") & (dataframe["NEW_IS_INVESTOR"] == "investor"), 
+                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "german_investor"
+        dataframe.loc[(dataframe["Geography"] == "France") & (dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
+                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "french_not_investor"
+        dataframe.loc[(dataframe["Geography"] == "Spain") & (dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
+                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "spanish_not_investor"
+        dataframe.loc[(dataframe["Geography"] == "Germany") & (dataframe["NEW_IS_INVESTOR"] == "not_investor"), 
+                           "NEW_IS_GEOGRAPHY_INVESTOR"] = "german_not_investor"
+        
+        return dataframe
+    
 
-
-    def ordinalencoding(self, dataframe, train=True):
-        print(dataframe.columns)
-        investor_size = ['not_investor', 'investor']
+    def ordinalencoding_num(self, dataframe, train=True):
         age_cat_size = ['young', 'mature', 'senior']
         credi_score_size = ['very_risky', 'risky', 'normal', 'not_risky', 'very_not_risky']
 
-        enc = OrdinalEncoder(categories=[investor_size, age_cat_size, credi_score_size])
-        columns_to_encode = ["NEW_IS_INVESTOR", "NEW_AGE_CAT", "NEW_CREDİTSCORE_CAT"]
+        enc = OrdinalEncoder(categories=[ age_cat_size, credi_score_size])
+        columns_to_encode = ["NEW_AGE_CAT", "NEW_CREDİTSCORE_CAT"]
         if train:
             dataframe[columns_to_encode] = enc.fit_transform(dataframe[columns_to_encode])
             joblib.dump(enc, 'data/ordinal_encoder.pkl')
         else:
             loaded_encoder = joblib.load('data/ordinal_encoder.pkl')
-            dataframe[columns_to_encode] = loaded_encoder.transform(dataframe[columns_to_encode]) 
+            dataframe[columns_to_encode] = loaded_encoder.transform(dataframe[columns_to_encode])
+
         return dataframe
 
 
     def onehotencoding(self, dataframe, train=True):
-        self.cat_cols, self.num_cols, self.cat_but_car = self.create_col_type()
-        one_hot_cat_cols = [col for col in self.cat_cols if col not in ["NEW_IS_INVESTOR", "NEW_AGE_CAT", "NEW_CREDİTSCORE_CAT"]]
+        self.cat_cols, self.num_cols, self.cat_but_car = self.create_col_type(dataframe)
+        one_hot_cat_cols = [col for col in self.cat_cols if col not in ["NEW_AGE_CAT", "NEW_CREDİTSCORE_CAT"]]
         
 
         if train:
@@ -153,9 +154,10 @@ class Preprocess():
             dataframe.drop(columns=one_hot_cat_cols, inplace=True)
         
         return dataframe
+    
 
     def normalization(self, dataframe, train=True):
-        self.cat_cols, self.num_cols, self.cat_but_car = self.create_col_type()
+        self.cat_cols, self.num_cols, self.cat_but_car = self.create_col_type(dataframe)
         
         if train:
             scaler = StandardScaler()
@@ -168,5 +170,3 @@ class Preprocess():
         return dataframe
 
     
-    
-
