@@ -10,14 +10,14 @@ from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
 class Preprocess():
 
     def __init__(self, data):
-        self.dataframe  = data.drop(["id", "CustomerId", "Surname", "Exited"], axis=1)
+        self.dataframe  = data.drop(["id", "CustomerId", "Surname"], axis=1)
         self.cat_cols = []
         self.num_cols = []
         self.cat_but_car = []
         self.save_path = os.path.join(os.path.join(os.path.dirname(__file__), "..", "Model/models"))
         #os.makedirs(save_path, exist_ok=True)
 
-    def create_col_type(self, threshold_cat = 3, threshold_car = 20):
+    def create_col_type(self, threshold_cat = 11, threshold_car = 20):
         cat_cols = [col for col in self.dataframe.columns if self.dataframe[col].dtypes =='O']
         
         cat_but_car = [col for col in self.dataframe.columns if ((self.dataframe[col].dtypes =='O') 
@@ -157,5 +157,17 @@ class Preprocess():
         else:
             loaded_scaler = joblib.load(os.path.join(self.save_path, "standardscaler.pkl"))
             self.dataframe[self.num_cols] = loaded_scaler.transform(self.dataframe[self.num_cols])
+
+        return self.dataframe
+    
+
+    def preprocess_pipeline(self):
+        self.create_col_type()
+        self.Impute_missing_data()
+        self.Impute_outlier_data()
+        self.feature_engineering()
+        self.ordinalencoding(train=False)
+        self.onehotencoding(train=False)
+        self.normalization(train=False)
 
         return self.dataframe
