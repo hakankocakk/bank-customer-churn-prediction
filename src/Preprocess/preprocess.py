@@ -3,10 +3,6 @@ import numpy as np
 import joblib
 import os
 from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
-import preprocess
-from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import make_pipeline
 
 
 
@@ -18,7 +14,7 @@ class Preprocess():
         self.cat_cols = []
         self.num_cols = []
         self.cat_but_car = []
-        self.save_path = os.path.join(os.path.join(os.path.dirname(__file__), "..", "data"))
+        self.save_path = os.path.join(os.path.join(os.path.dirname(__file__), "..", "Model/models"))
         #os.makedirs(save_path, exist_ok=True)
 
     def create_col_type(self, threshold_cat = 3, threshold_car = 20):
@@ -32,8 +28,8 @@ class Preprocess():
         cat_cols = cat_cols + num_but_cat
         num_cols = [col for col in self.dataframe.columns if self.dataframe[col].dtypes !='O']
         num_cols = [col for col in num_cols if col not in num_but_cat]
-        #num_cols = [col for col in num_cols if col not in ['id', 'CustomerId']]
-        #cat_cols = [col for col in cat_cols if col not in ["Surname"]]
+        num_cols = [col for col in num_cols if col not in ['id', 'CustomerId']]
+        cat_cols = [col for col in cat_cols if col not in ["Surname"]]
         self.cat_cols = cat_cols
         self.num_cols = num_cols
         self.cat_but_car = cat_but_car
