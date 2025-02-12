@@ -1,51 +1,63 @@
 import pandas as pd
-import preprocess
-import joblib
-from imblearn.under_sampling import NearMiss
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline, make_pipeline
+import click
+from Preprocess.preprocess import Preprocess
+from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import FunctionTransformer, StandardScaler
-from xgboost import XGBClassifier
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.pipeline import make_pipeline
+from sklearn.ensemble import VotingClassifier
+from Model.model import Models
 
 
-def main():
+@click.command()
+@click.argument('data_path', type=click.Path(exists=True))
+def main(data_path):
 
-    dataframe = pd.read_csv("C:/Users/Hakan/bank-customer-churn-prediction/data/train.csv")
-    X = dataframe.drop(["id", "CustomerId", "Surname", "Exited"], axis=1)
-    y = dataframe["Exited"]
-
-    X_train, X_, y_train, y_ = train_test_split(X, y, test_size=0.3, random_state=42)
-    X_val, X_test, y_val, y_test = train_test_split(X_, y_, test_size=0.15, random_state=42)
-
-    preprocessing = preprocess.Preprocess(X_train, y_train)
-
-    pipeline = Pipeline(
-        steps=[
-            ("impute_missing_num", FunctionTransformer(preprocessing.Impute_missing_num_data)),
-            ("impute_missing_cat", FunctionTransformer(preprocessing.Impute_missing_cat_data)),
-            ("impute_outlier", FunctionTransformer(preprocessing.Impute_outlier_data)),
-            ("feature_engineering", FunctionTransformer(preprocessing.feature_engineering)),
-            ("ordinal_encoding", FunctionTransformer(preprocessing.ordinalencoding_num)),
-            ("onehot_encoding", FunctionTransformer(preprocessing.onehotencoding)),
-            ("scaler", StandardScaler()), 
-            ("model", XGBClassifier())
-        ]
+    dataframe = pd.read_csv(data_path)
+    X_train = dataframe.drop(["id", "CustomerId", "Surname", "Exited"], axis=1)
+    y_train = dataframe["Exited"]
+    
+    preprocessing = Preprocess(dataframe)
+    numeric_processor = Pipeline(
+        steps=[("Impute_missing_data", preprocessing.Impute_missing_data()),
+               ("Impute_outlier_data", preprocessing.Impute_outlier_data()),
+               ("feature_engineering", preprocessing.feature_engineering())]
     )
 
+    categoric_processor = Pipeline(
+        steps=[("Impute_missing_data", preprocessing.Impute_missing_data()),
+               ("Impute_outlier_data", preprocessing.Impute_outlier_data()),
+               ("feature_engineering", preprocessing.feature_engineering()),
+               ("ordinalencoding", preprocessing.ordinalencoding()),
+               ("onehotencoding", preprocessing.onehotencoding())]
+    )
 
-    pipeline.fit(X_train, y_train)
-    joblib.dump(pipeline, 'src/saved_pipeline.pkl')
+    preprocessor_pipeline = ColumnTransformer(
+        [("categorical", categoric_processor),
+        ("numerical", numeric_processor),
+        ("standardscaler", preprocessing.normalization())]
+    )
 
-    loaded_pipeline = joblib.load('src/saved_pipeline.pkl')
-    y_pred = loaded_pipeline.predict(X_test)
+    print(preprocessor_pipeline)
 
-    accuracy = accuracy_score(y_test, y_pred)
-    print(f"Accuracy: {accuracy:.2f}")
 
-    f1 = f1_score(y_test, y_pred)
-    print(f"F1 Score: {f1:.2f}")
+    ensemble_model = VotingClassifier(
+        estimators=[
+            "Models", Models()
+            ("XgBoost", Models.xgboost_model()),
+            ("LightGBM", Models.lgbm_model()),
+            ("CatBoost", Models.catboost_model())
+        ],
+        voting="soft"
+    )
+
+    full_pipeline = Pipeline([
+        ("preprocessing", preprocessor_pipeline),  # Ön işleme pipeline
+        ("ensemble", ensemble_model)  # Ensemble model
+    ])
+
+    #preprocessing_pipeline = make_pipeline(full_pipeline)
+
+
 
 if __name__ == '__main__':
     main()
