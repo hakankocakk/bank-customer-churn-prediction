@@ -1,8 +1,11 @@
 import pandas as pd
 import numpy as np
+import os
+from ..Preprocess.preprocess import Preprocess
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
+from sklearn.ensemble import VotingClassifier
 from sklearn.model_selection import train_test_split, GridSearchCV, cross_validate, RandomizedSearchCV, validation_curve
 from sklearn.metrics import accuracy_score, f1_score, classification_report, confusion_matrix
 import joblib
@@ -14,13 +17,11 @@ import click
 
 class Models():
 
-    def __init__(self, data):
-        self.data = data
-        self.X_train = self.data.drop(["id", "CustomerId", "Surname", "Exited"], axis=1)
-        self.y_train = self.data["Exited"]
-        self.sample_weight = np.where(self.y_train == 1, 3, 0.5)
-    
-    def xgboost_model(self):
+    def __init__(self):
+        self.save_path = os.path.join(os.path.join(os.path.dirname(__file__), "models"))
+
+    def xgboost_model(self, X_train, y_train):
+        sample_weight = np.where(y_train == 1, 3, 0.5)
         xgboost_best_params = {
             "learning_rate": 0.01,
             "max_depth": 5,
@@ -29,17 +30,14 @@ class Models():
             "device": "cuda"
             }
         
-        #X_train_gpu = cp.array(X_train)
-        #y_train_gpu = cp.array(y_train)
-        #class_weights_gpu = cp.array(sample_weight) 
-        
-        
-        xgboost_final = XGBClassifier(**xgboost_best_params).fit(self.X_train, self.y_train, sample_weight=self.sample_weight)
-        
+        xgboost_final = XGBClassifier(**xgboost_best_params).fit(X_train, y_train, sample_weight=sample_weight)
+        joblib.dump(xgboost_final, os.path.join(self.save_path, "xgboost_model.pkl"))
+
         return xgboost_final
     
 
-    def lgbm_model(self):
+    def lightgbm_model(self, X_train, y_train):
+        sample_weight = np.where(y_train == 1, 3, 0.5)
         lgbm_best_params = {
             "num_leaves": 15,
             "max_depth": -1,
@@ -48,12 +46,14 @@ class Models():
             "verbosity" : -1,
             "device": "gpu"
             }
-        
-        lgbm_final = LGBMClassifier(**lgbm_best_params).fit(self.X_train, self.y_train, sample_weight = self.sample_weight)
+        lgbm_final = LGBMClassifier(**lgbm_best_params).fit(X_train, y_train, sample_weight = sample_weight)
+        joblib.dump(lgbm_final, os.path.join(self.save_path, "lightgbm_model.pkl"))
 
         return lgbm_final
 
-    def catboost_model(self):
+
+    def catboost_model(self, X_train, y_train):
+        sample_weight = np.where(y_train == 1, 3, 0.5)
         catboost_best_params = {
             "iterations": 200,
             "learning_rate": 0.1,
@@ -62,10 +62,41 @@ class Models():
             "verbose" : False,
             "task_type": "GPU"
             }
-        
-        catboost_final = CatBoostClassifier(**catboost_best_params).fit(self.X_train, self.y_train,  sample_weight = self.sample_weight)
+        catboost_final = CatBoostClassifier(**catboost_best_params).fit(X_train, y_train,  sample_weight = sample_weight)
+        joblib.dump(catboost_final, os.path.join(self.save_path, "catboost_model.pkl"))
 
         return catboost_final
-        
+    
+
+    def ensemble_model(self, X_train, y_train):
+        sample_weight = np.where(y_train == 1, 3, 0.5)
+        ensemble_model = VotingClassifier(
+            estimators=[
+                ("XgBoost", self.xgboost_model(X_train, y_train)),
+                ("LightGBM", self.lightgbm_model(X_train, y_train)),
+                ("CatBoost", self.catboost_model(X_train, y_train))
+            ],
+            voting="soft"
+        )
+        ensemble_model = ensemble_model.fit(X_train, y_train, sample_weight=sample_weight)
+        joblib.dump(ensemble_model, os.path.join(self.save_path, "ensemble_model.pkl"))
+
+        return ensemble_model
+
+
+@click.command()
+@click.argument('data_path', type=click.Path(exists=True))
+def train(data_path):
+    dataframe = pd.read_csv(data_path)
+    X_train = dataframe.drop(["Exited"], axis=1)
+    y_train = dataframe["Exited"]
+    preprocess = Preprocess(X_train)
+    preprocess_data = preprocess.preprocess_pipeline()
+    ensemble_model = Models().ensemble_model(preprocess_data, y_train)
+ 
+if __name__ == '__main__':
+    train()
+
+            
         
 
