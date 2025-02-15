@@ -1,63 +1,44 @@
+from flask import Flask, request, jsonify
+import os
+import numpy as np
 import pandas as pd
-import click
 from Preprocess.preprocess import Preprocess
-from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import make_pipeline
-from sklearn.ensemble import VotingClassifier
-from Model.model import Models
+import joblib
 
 
-@click.command()
-@click.argument('data_path', type=click.Path(exists=True))
-def main(data_path):
+app = Flask(__name__)
 
-    dataframe = pd.read_csv(data_path)
-    X_train = dataframe.drop(["id", "CustomerId", "Surname", "Exited"], axis=1)
-    y_train = dataframe["Exited"]
-    
-    preprocessing = Preprocess(dataframe)
-    numeric_processor = Pipeline(
-        steps=[("Impute_missing_data", preprocessing.Impute_missing_data()),
-               ("Impute_outlier_data", preprocessing.Impute_outlier_data()),
-               ("feature_engineering", preprocessing.feature_engineering())]
-    )
+def load_model():
+    model_path = os.path.join(os.path.join(os.path.dirname(__file__), "Model", "models"))
+    ensemble_model = joblib.load(os.path.join(model_path, "ensemble_model.pkl"))
+    return ensemble_model
 
-    categoric_processor = Pipeline(
-        steps=[("Impute_missing_data", preprocessing.Impute_missing_data()),
-               ("Impute_outlier_data", preprocessing.Impute_outlier_data()),
-               ("feature_engineering", preprocessing.feature_engineering()),
-               ("ordinalencoding", preprocessing.ordinalencoding()),
-               ("onehotencoding", preprocessing.onehotencoding())]
-    )
-
-    preprocessor_pipeline = ColumnTransformer(
-        [("categorical", categoric_processor),
-        ("numerical", numeric_processor),
-        ("standardscaler", preprocessing.normalization())]
-    )
-
-    print(preprocessor_pipeline)
+@app.route("/")
+def home():
+    return "<h2> Bank Customer Churn Prediction</h2>"
 
 
-    ensemble_model = VotingClassifier(
-        estimators=[
-            "Models", Models()
-            ("XgBoost", Models.xgboost_model()),
-            ("LightGBM", Models.lgbm_model()),
-            ("CatBoost", Models.catboost_model())
-        ],
-        voting="soft"
-    )
+@app.route("/predict", methods=["POST"])
+def predict():
+    try:
+        data = request.get_json()
+        print(f"Received data: {data}") 
 
-    full_pipeline = Pipeline([
-        ("preprocessing", preprocessor_pipeline),  # Ön işleme pipeline
-        ("ensemble", ensemble_model)  # Ensemble model
-    ])
+        if not data:
+            return jsonify({"error": "No input data found"}), 400
+        
+        dataframe = pd.DataFrame(data)
+        dataframe.reset_index(drop=True, inplace=True)
 
-    #preprocessing_pipeline = make_pipeline(full_pipeline)
+        preprocess = Preprocess(dataframe)
+        preprocess_data = preprocess.preprocess_pipeline()
+        model = load_model()
+        predict = model.predict(preprocess_data)
+
+        return jsonify({"Predict": predict.tolist()})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    app.run(debug=True, port=8000, host="0.0.0.0")
