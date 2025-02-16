@@ -31,7 +31,7 @@ def predict():
         dataframe.reset_index(drop=True, inplace=True)
 
         preprocess = Preprocess(dataframe)
-        preprocess_data = preprocess.preprocess_pipeline()
+        preprocess_data = preprocess.preprocess_pipeline(train=False)
         model = load_model()
         predict = model.predict(preprocess_data)
 
