@@ -20,7 +20,7 @@ def predict(data_path):
     dataframe = pd.read_csv(data_path)
     preprocess = Preprocess(dataframe)
 
-    preprocess_data = preprocess.preprocess_pipeline()
+    preprocess_data = preprocess.preprocess_pipeline(train=False)
     ensemble_model = load_model()
     predict = ensemble_model.predict(preprocess_data)
     
