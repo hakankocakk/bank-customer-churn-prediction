@@ -36,14 +36,23 @@ class Preprocess():
         return self.cat_cols, self.num_cols, self.cat_but_car
     
     
-    def Impute_missing_data(self):
+    def Impute_missing_data(self, train=True):
+
+        if train == False:
+            self.num_cols = ['CreditScore', 'Age', 'Balance', 'EstimatedSalary']
+            self.cat_cols = ['Geography', 'Gender', 'Tenure', 'NumOfProducts', 'HasCrCard', 'IsActiveMember']
+
         for col in self.num_cols:
             self.dataframe.loc[self.dataframe[col].isnull(), col] = self.dataframe[col].median()
         for col in self.cat_cols:
             self.dataframe.loc[self.dataframe[col].isnull(), col] = "Unknown"
         return self.dataframe
 
-    def Impute_outlier_data(self, q1=0.15, q3=0.85):
+    def Impute_outlier_data(self, train=True, q1=0.15, q3=0.85):
+
+        if train == False:
+            self.num_cols = ['CreditScore', 'Age', 'Balance', 'EstimatedSalary']
+
         for col in self.num_cols:
             self.dataframe[col] = self.dataframe[col].astype(float)
 
@@ -138,6 +147,8 @@ class Preprocess():
             self.dataframe = pd.concat([self.dataframe, encoded_df], axis=1)
             self.dataframe.drop(columns=one_hot_cat_cols, inplace=True)
         else:
+            self.cat_cols = ['Geography', 'Gender', 'Tenure', 'NumOfProducts', 'HasCrCard', 'IsActiveMember', 'NEW_ACTİVE_CARD', 'NEW_IS_GEOGRAPHY_INVESTOR', 'NEW_IS_INVESTOR', 'NEW_AGE_CAT', 'NEW_CREDİTSCORE_CAT']
+            one_hot_cat_cols = [col for col in self.cat_cols if col not in ["NEW_IS_INVESTOR", "NEW_AGE_CAT", "NEW_CREDİTSCORE_CAT"]]
             loaded_ohe = joblib.load(os.path.join(self.save_path, "onehot_encoder.pkl"))
             encoded_test_data = loaded_ohe.transform(self.dataframe[one_hot_cat_cols])
             new_columns = loaded_ohe.get_feature_names_out(one_hot_cat_cols)
@@ -155,19 +166,20 @@ class Preprocess():
             self.dataframe[self.num_cols] = scaler.fit_transform(self.dataframe[self.num_cols])
             joblib.dump(scaler, os.path.join(self.save_path, "standardscaler.pkl"))
         else:
+            self.num_cols = ['CreditScore', 'Age', 'Balance', 'EstimatedSalary']
             loaded_scaler = joblib.load(os.path.join(self.save_path, "standardscaler.pkl"))
             self.dataframe[self.num_cols] = loaded_scaler.transform(self.dataframe[self.num_cols])
 
         return self.dataframe
     
 
-    def preprocess_pipeline(self):
+    def preprocess_pipeline(self, train=True):
         self.create_col_type()
-        self.Impute_missing_data()
-        self.Impute_outlier_data()
+        self.Impute_missing_data(train=train)
+        self.Impute_outlier_data(train=train)
         self.feature_engineering()
-        self.ordinalencoding(train=False)
-        self.onehotencoding(train=False)
-        self.normalization(train=False)
+        self.ordinalencoding(train=train)
+        self.onehotencoding(train=train)
+        self.normalization(train=train)
 
         return self.dataframe
